@@ -142,10 +142,9 @@ class YourBuyerAgent(BaseBuyerAgent):
     """
     
     def define_personality(self) -> Dict[str, Any]:
-        """
-        TODO: Good in communication,Calm at any situation
         
-        Choose from: diplomatic
+        #TODO: Good in communication,Calm at any situation
+        #Choose from: diplomatic
         return {
             "personality_type": "diplomatic", 
             "traits": ["collaborative", "clear-communication","calm","principled","win-win"],  # Define 3-5 traits
@@ -441,6 +440,210 @@ def run_negotiation_test(buyer_agent: BaseBuyerAgent, product: Product, buyer_bu
     
     return result
 
+# ============================================
+# NEW: DIPLOMAT SELLER + SELLER TEST HARNESS
+# ============================================
+
+class BaseSellerAgent(ABC):
+    """Minimal seller base to mirror testing on the seller side."""
+    def _init_(self, name: str):
+        self.name = name
+        self.personality = self.define_personality()
+
+    @abstractmethod
+    def define_personality(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def generate_opening_price(self, product: Product) -> Tuple[int, str]:
+        pass
+
+    @abstractmethod
+    def respond_to_buyer_offer(self, product: Product, buyer_offer: int, round_num: int) -> Tuple[str, int, str]:
+        """
+        Returns (status, next_price, message)
+        status: "accepted" | "ongoing"
+        """
+        pass
+
+    @abstractmethod
+    def get_personality_prompt(self) -> str:
+        pass
+
+
+class YourSellerAgent(BaseSellerAgent):
+    """
+    Diplomat-style seller mirroring the buyer's temperament.
+    - Anchors above market with justification
+    - Gives principled, symmetrical concessions toward a fair zone
+    - Closes early if buyer reaches fair value corridor
+    """
+
+    def define_personality(self) -> Dict[str, Any]:
+        return {
+            "personality_type": "diplomatic",
+            "traits": ["collaborative", "transparent", "calm", "principled", "win-win"],
+            "negotiation_style": "Opens high with rationale, reciprocates genuine moves, seeks stable partnerships.",
+            "catchphrases": [
+                "Let's align on value and quality.",
+                "I prioritize repeat business over one-off wins.",
+                "We can bridge this thoughtfully."
+            ]
+        }
+
+    def _quality_multiplier(self, product: Product) -> float:
+        q = product.quality_grade.strip().lower()
+        if q == "export":
+            return 1.15
+        if q == "a":
+            return 1.06
+        if q == "b":
+            return 0.94
+        return 1.0
+
+    def fair_price(self, product: Product) -> int:
+        base = product.base_market_price
+        qf = self._quality_multiplier(product)
+        origin_factor = 1.05 if product.origin.lower() in {"colombia", "ethiopia", "yirgacheffe"} else 1.0
+        logistics = 1.01  # small handling/assurance
+        return int(round(base * qf * origin_factor * logistics))
+
+    def seller_zone(self, product: Product) -> Tuple[int, int]:
+        fair = self.fair_price(product)
+        # Seller would like 100%–110% of fair
+        return int(fair * 1.00), int(fair * 1.10)
+
+    def generate_opening_price(self, product: Product) -> Tuple[int, str]:
+        fair = self.fair_price(product)
+        opening = int(fair * 1.28)  # assertive but not outrageous
+        msg = (
+            f"{self.personality['catchphrases'][0]} For {product.quantity} units of "
+            f"{product.quality_grade}-grade {product.name} ({product.origin}), my opening is ₹{opening:,}. "
+            f"This reflects current market, quality, and assurance."
+        )
+        return opening, msg
+
+    def respond_to_buyer_offer(self, product: Product, buyer_offer: int, round_num: int) -> Tuple[str, int, str]:
+        fair = self.fair_price(product)
+        low, high = self.seller_zone(product)
+
+        # Accept if buyer enters our target zone
+        if low <= buyer_offer <= high:
+            return "accepted", buyer_offer, (
+                f"Agreed at ₹{buyer_offer:,}. {self.personality['catchphrases'][1]}"
+            )
+
+        # If compelling (>= 98% of fair), accept to secure relationship
+        if buyer_offer >= int(fair * 0.98):
+            return "accepted", buyer_offer, "That's reasonable—let's lock it in."
+
+        # Concession pattern
+        rounds_left = 10 - (round_num + 1)
+        if rounds_left >= 6:
+            step_down = 0.07
+        elif rounds_left >= 3:
+            step_down = 0.05
+        else:
+            step_down = 0.03
+
+        # Move from our current ask toward mid-point with guardrails
+        # If first response, craft an ask based on opening
+        if round_num == 0:
+            ask = int(fair * 1.28)
+        else:
+            # heuristic: previous ask decays by step_down
+            ask = int(fair * (1.28 - (0.06 * min(round_num, 4))))
+
+        midpoint = (ask + max(buyer_offer, int(fair * 0.90))) / 2
+        counter = int(max(midpoint, fair * (1.00 + step_down)))  # keep above fair early
+
+        if round_num >= 8:
+            counter = int(max(counter, fair))  # be willing to close near fair
+
+        msg = (
+            f"I appreciate your offer. Considering quality and fulfillment, I can improve to ₹{counter:,}. "
+            f"{self.personality['catchphrases'][2]}"
+        )
+        return "ongoing", counter, msg
+
+    def get_personality_prompt(self) -> str:
+        return (
+            "You are a diplomatic seller who aims for win–win deals. "
+            "You justify pricing with market, quality, and reliability, "
+            "and you reciprocate genuine movement from the buyer. "
+            "You close within a fair corridor to secure long-term partnerships."
+        )
+
+
+# Mock Buyer for Seller Testing
+class MockBuyerForSeller:
+    def _init_(self, budget: int):
+        self.budget = budget
+
+    def get_opening_offer(self, product: Product) -> Tuple[int, str]:
+        # Opens at ~80% of market as a reasonable buyer
+        opening = int(product.base_market_price * 0.80)
+        opening = min(opening, self.budget)
+        return opening, f"I'm opening at ₹{opening:,} based on market checks."
+
+    def respond_to_seller(self, seller_price: int, round_num: int, product: Product) -> Tuple[int, str, bool]:
+        # Simple principled increases capped by budget
+        if seller_price <= self.budget and seller_price <= int(product.base_market_price * 0.95):
+            return seller_price, "Accepted. Let's proceed.", True
+
+        # Concession pattern
+        if round_num >= 8:
+            bump = 0.05
+        else:
+            bump = 0.07
+        # last offer approximated as seller_price * (1 - margin); propose up by bump from last
+        counter = min(int(max(seller_price * (1 - 0.12), product.base_market_price * 0.90)), self.budget)
+        counter = min(int(counter * (1 + bump)), self.budget)
+        return counter, f"I can move to ₹{counter:,}. Can you meet me closer?", False
+
+
+def run_seller_negotiation_test(seller_agent: YourSellerAgent, product: Product, buyer_budget: int) -> Dict[str, Any]:
+    mock_buyer = MockBuyerForSeller(buyer_budget)
+    messages = []
+
+    seller_price, seller_msg = seller_agent.generate_opening_price(product)
+    messages.append({"role": "seller", "message": seller_msg})
+
+    deal_made = False
+    final_price = None
+    current_round = 0
+    for round_num in range(10):
+        current_round = round_num + 1
+
+        if round_num == 0:
+            buyer_offer, buyer_msg = mock_buyer.get_opening_offer(product)
+        else:
+            buyer_offer, buyer_msg, buyer_accepts = mock_buyer.respond_to_seller(seller_price, round_num, product)
+            if buyer_accepts:
+                deal_made = True
+                final_price = buyer_offer
+                messages.append({"role": "buyer", "message": buyer_msg})
+                break
+
+        messages.append({"role": "buyer", "message": buyer_msg})
+
+        status, next_price, seller_msg = seller_agent.respond_to_buyer_offer(product, buyer_offer, round_num)
+        messages.append({"role": "seller", "message": seller_msg})
+
+        if status == "accepted":
+            deal_made = True
+            final_price = buyer_offer
+            break
+
+        seller_price = next_price
+
+    result = {
+        "deal_made": deal_made,
+        "final_price": final_price,
+        "rounds": current_round,
+        "conversation": messages
+    }
+    return result
 
 # ============================================
 # PART 6: TEST YOUR AGENT
