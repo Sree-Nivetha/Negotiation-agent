@@ -1,20 +1,3 @@
-"""
-===========================================
-AI NEGOTIATION AGENT - INTERVIEW TEMPLATE
-===========================================
-
-Welcome! Your task is to build a BUYER agent that can negotiate effectively
-against our hidden SELLER agent. Success is measured by achieving profitable
-deals while maintaining character consistency.
-
-INSTRUCTIONS:
-1. Read through this entire template first
-2. Implement your agent in the marked sections
-3. Test using the provided framework
-4. Submit your completed code with documentation
-
-"""
-
 import json
 import re
 from typing import Dict, List, Optional, Tuple, Any
@@ -754,28 +737,4 @@ if __name__ == "_main_":
     test_buyer_agent()
     print("\n" + "#"*60 + "\n")
     test_seller_agent()
-
-
-# ============================================
-# PART 8: SUBMISSION CHECKLIST
-# ============================================
-
-"""
-BEFORE SUBMITTING, ENSURE:
-
-[ ] Your agent is fully implemented in YourBuyerAgent class
-[ ] You've defined a clear, consistent personality
-[ ] Your agent NEVER exceeds its budget
-[ ] You've tested using test_your_agent()
-[ ] You've added helpful comments explaining your strategy
-[ ] You've included any additional helper methods
-
-SUBMIT:
-1. This completed template file
-2. A 1-page document explaining:
-   - Your chosen personality and why
-   - Your negotiation strategy
-   - Key insights from testing
-
-FILENAME: negotiation_agent_[your_name].py
-"""
+    
