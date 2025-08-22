@@ -649,107 +649,112 @@ def run_seller_negotiation_test(seller_agent: YourSellerAgent, product: Product,
 # PART 6: TEST YOUR AGENT
 # ============================================
 
-def test_your_agent():
-    """Run this to test your agent implementation"""
-    
-    # Create test products
-    test_products = [
-        Product(
-            name="Alphonso Mangoes",
-            category="Mangoes",
-            quantity=100,
-            quality_grade="A",
-            origin="Ratnagiri",
-            base_market_price=180000,
-            attributes={"ripeness": "optimal", "export_grade": True}
-        ),
-        Product(
-            name="Kesar Mangoes", 
-            category="Mangoes",
-            quantity=150,
-            quality_grade="B",
-            origin="Gujarat",
-            base_market_price=150000,
-            attributes={"ripeness": "semi-ripe", "export_grade": False}
-        )
-    ]
-    
-    # Initialize your agent
-    your_agent = YourBuyerAgent("TestBuyer")
-    
+def buyer() -> YourBuyerAgent:
+    """Factory for the diplomat buyer agent (for training/plug-in)."""
+    return YourBuyerAgent("DiplomatBuyer")
+
+def seller() -> YourSellerAgent:
+    """Factory for the diplomat seller agent (for training/plug-in)."""
+    return YourSellerAgent("DiplomatSeller")
+
+def test_buyer_agent():
+    """Run tests for the BUYER agent against the provided MockSellerAgent."""
+    # Non-mango product
+    product = Product(
+        name="Arabica Coffee Beans",
+        category="Coffee",
+        quantity=200,
+        quality_grade="A",
+        origin="Colombia",
+        base_market_price=240000,  # reference for lot
+        attributes={"roast": "green", "screen_size": "17/18", "crop_year": "2024-25"}
+    )
+
+    your_agent = buyer()
+
     print("="*60)
-    print(f"TESTING YOUR AGENT: {your_agent.name}")
+    print(f"TESTING BUYER: {your_agent.name}")
     print(f"Personality: {your_agent.personality['personality_type']}")
     print("="*60)
-    
-    total_savings = 0
+
+    scenarios = [
+        ("easy", int(product.base_market_price * 1.25), int(product.base_market_price * 0.82)),
+        ("medium", int(product.base_market_price * 1.00), int(product.base_market_price * 0.86)),
+        ("hard", int(product.base_market_price * 0.90), int(product.base_market_price * 0.84)),
+    ]
+
     deals_made = 0
-    
-    # Run multiple test scenarios
-    for product in test_products:
-        for scenario in ["easy", "medium", "hard"]:
-            if scenario == "easy":
-                buyer_budget = int(product.base_market_price * 1.2)
-                seller_min = int(product.base_market_price * 0.8)
-            elif scenario == "medium":
-                buyer_budget = int(product.base_market_price * 1.0)
-                seller_min = int(product.base_market_price * 0.85)
-            else:  # hard
-                buyer_budget = int(product.base_market_price * 0.9)
-                seller_min = int(product.base_market_price * 0.82)
-            
-            print(f"\nTest: {product.name} - {scenario} scenario")
-            print(f"Your Budget: ₹{buyer_budget:,} | Market Price: ₹{product.base_market_price:,}")
-            
-            result = run_negotiation_test(your_agent, product, buyer_budget, seller_min)
-            
-            if result["deal_made"]:
-                deals_made += 1
-                total_savings += result["savings"]
-                print(f"✅ DEAL at ₹{result['final_price']:,} in {result['rounds']} rounds")
-                print(f"   Savings: ₹{result['savings']:,} ({result['savings_pct']:.1f}%)")
-                print(f"   Below Market: {result['below_market_pct']:.1f}%")
-            else:
-                print(f"❌ NO DEAL after {result['rounds']} rounds")
-    
-    # Summary
+    total_savings = 0
+
+    for label, buyer_budget, seller_min in scenarios:
+        print(f"\nTest: {product.name} - {label} scenario")
+        print(f"Your Budget: ₹{buyer_budget:,} | Market Price: ₹{product.base_market_price:,}")
+        result = run_negotiation_test(your_agent, product, buyer_budget, seller_min)
+        if result["deal_made"]:
+            deals_made += 1
+            total_savings += result["savings"]
+            print(f"✅ DEAL at ₹{result['final_price']:,} in {result['rounds']} rounds")
+            print(f"   Savings: ₹{result['savings']:,} ({result['savings_pct']:.1f}%)")
+            print(f"   Below Market: {result['below_market_pct']:.1f}%")
+        else:
+            print(f"❌ NO DEAL after {result['rounds']} rounds")
+
     print("\n" + "="*60)
-    print("SUMMARY")
-    print(f"Deals Completed: {deals_made}/6")
+    print("SUMMARY (BUYER)")
+    print(f"Deals Completed: {deals_made}/3")
     print(f"Total Savings: ₹{total_savings:,}")
-    print(f"Success Rate: {deals_made/6*100:.1f}%")
+    print("="*60)
+
+def test_seller_agent():
+    """Run tests for the SELLER agent against a mock buyer."""
+    product = Product(
+        name="Arabica Coffee Beans",
+        category="Coffee",
+        quantity=200,
+        quality_grade="A",
+        origin="Colombia",
+        base_market_price=240000,
+        attributes={"roast": "green", "screen_size": "17/18", "crop_year": "2024-25"}
+    )
+
+    agent = seller()
+    buyer_budgets = [
+        int(product.base_market_price * 1.20),
+        int(product.base_market_price * 1.00),
+        int(product.base_market_price * 0.92),
+    ]
+
+    print("="*60)
+    print(f"TESTING SELLER: {agent.name}")
+    print(f"Personality: {agent.personality['personality_type']}")
+    print("="*60)
+
+    wins = 0
+    for i, budget in enumerate(buyer_budgets, 1):
+        print(f"\nScenario {i}: Buyer budget ₹{budget:,}")
+        result = run_seller_negotiation_test(agent, product, budget)
+        if result["deal_made"]:
+            wins += 1
+            print(f"✅ DEAL at ₹{result['final_price']:,} in {result['rounds']} rounds")
+        else:
+            print(f"❌ NO DEAL after {result['rounds']} rounds")
+
+    print("\n" + "="*60)
+    print("SUMMARY (SELLER)")
+    print(f"Deals Completed: {wins}/{len(buyer_budgets)}")
     print("="*60)
 
 
 # ============================================
-# PART 7: EVALUATION CRITERIA
+# MAIN
 # ============================================
 
-"""
-YOUR SUBMISSION WILL BE EVALUATED ON:
+if __name__ == "_main_":
+    # Run both tests
+    test_buyer_agent()
+    print("\n" + "#"*60 + "\n")
+    test_seller_agent()
 
-1. **Deal Success Rate (30%)**
-   - How often you successfully close deals
-   - Avoiding timeouts and failed negotiations
-
-2. **Savings Achieved (30%)**
-   - Average discount from seller's opening price
-   - Performance relative to market price
-
-3. **Character Consistency (20%)**
-   - How well you maintain your chosen personality
-   - Appropriate use of catchphrases and style
-
-4. **Code Quality (20%)**
-   - Clean, well-structured implementation
-   - Good use of helper methods
-   - Clear documentation
-
-BONUS POINTS FOR:
-- Creative, unique personalities
-- Sophisticated negotiation strategies
-- Excellent adaptation to different scenarios
-"""
 
 # ============================================
 # PART 8: SUBMISSION CHECKLIST
@@ -774,12 +779,3 @@ SUBMIT:
 
 FILENAME: negotiation_agent_[your_name].py
 """
-
-if __name__ == "__main__":
-    # Run this to test your implementation
-    test_your_agent()
-    
-    # Uncomment to see how the example agent performs
-    # print("\n\nTESTING EXAMPLE AGENT FOR COMPARISON:")
-    # example_agent = ExampleSimpleAgent("ExampleBuyer")
-    # test_your_agent()
