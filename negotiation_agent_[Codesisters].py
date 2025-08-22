@@ -681,12 +681,9 @@ def test_seller_agent():
     print("="*60)
 
 
-# ============================================
-# MAIN
-# ============================================
-
 if __name__ == "_main_":
     # Run both tests
     test_buyer_agent()
     print("\n" + "#"*60 + "\n")
     test_seller_agent()
+
