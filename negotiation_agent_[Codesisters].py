@@ -280,56 +280,9 @@ class YourBuyerAgent(BaseBuyerAgent):
             "last_seller": context.seller_offers[-1] if context.seller_offers else None,
             "last_buyer": context.your_offers[-1] if context.your_offers else None
         }
-# ============================================
-# PART 4: EXAMPLE SIMPLE AGENT (FOR REFERENCE)
-# ============================================
-
-class ExampleSimpleAgent(BaseBuyerAgent):
-    """
-    A simple example agent that you can use as reference.
-    This agent has basic logic - you should do better!
-    """
-    
-    def define_personality(self) -> Dict[str, Any]:
-        return {
-            "personality_type": "cautious",
-            "traits": ["careful", "budget-conscious", "polite"],
-            "negotiation_style": "Makes small incremental offers, very careful with money",
-            "catchphrases": ["Let me think about that...", "That's a bit steep for me"]
-        }
-    
-    def generate_opening_offer(self, context: NegotiationContext) -> Tuple[int, str]:
-        # Start at 60% of market price
-        opening = int(context.product.base_market_price * 0.6)
-        opening = min(opening, context.your_budget)
-        
-        return opening, f"I'm interested, but ₹{opening} is what I can offer. Let me think about that..."
-   
-    def respond_to_seller_offer(self, context: NegotiationContext, seller_price: int, seller_message: str) -> Tuple[DealStatus, int, str]:
-        # Accept if within budget and below 85% of market
-        if seller_price <= context.your_budget and seller_price <= context.product.base_market_price * 0.85:
-            return DealStatus.ACCEPTED, seller_price, f"Alright, ₹{seller_price} works for me!"
-        
-        # Counter with small increment
-        last_offer = context.your_offers[-1] if context.your_offers else 0
-        counter = min(int(last_offer * 1.1), context.your_budget)
-        
-        if counter >= seller_price * 0.95:  # Close to agreement
-            counter = min(seller_price - 1000, context.your_budget)
-            return DealStatus.ONGOING, counter, f"That's a bit steep for me. How about ₹{counter}?"
-        
-        return DealStatus.ONGOING, counter, f"I can go up to ₹{counter}, but that's pushing my budget."
-    
-    def get_personality_prompt(self) -> str:
-        return """
-        I am a cautious buyer who is very careful with money. I speak politely but firmly.
-        I often say things like 'Let me think about that' or 'That's a bit steep for me'.
-        I make small incremental offers and show concern about my budget.
-        """
-
 
 # ============================================
-# PART 5: TESTING FRAMEWORK (DO NOT MODIFY)
+# PART 4: TESTING FRAMEWORK (DO NOT MODIFY)
 # ============================================
 
 class MockSellerAgent:
@@ -629,7 +582,7 @@ def run_seller_negotiation_test(seller_agent: YourSellerAgent, product: Product,
     return result
 
 # ============================================
-# PART 6: TEST YOUR AGENT
+# PART 5: TEST YOUR AGENT
 # ============================================
 
 def buyer() -> YourBuyerAgent:
@@ -737,4 +690,3 @@ if __name__ == "_main_":
     test_buyer_agent()
     print("\n" + "#"*60 + "\n")
     test_seller_agent()
-    
